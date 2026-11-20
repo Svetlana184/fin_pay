@@ -26,7 +26,7 @@ class SavingsAccount {
     required this.status,
     required this.minBalance,
     required this.createdAt,
-    required this.updatedAt,
+    required this.updatedAt, required String userId,
   });
 
   factory SavingsAccount.fromJson(Map<String, dynamic> json) {
@@ -45,7 +45,7 @@ class SavingsAccount {
       status: (json['status'] as String?) ?? 'active',
       minBalance: double.tryParse(json['min_balance']?.toString() ?? '0') ?? 0.0,
       createdAt: (json['created_at'] as String?) ?? '',
-      updatedAt: (json['updated_at'] as String?) ?? '',
+      updatedAt: (json['updated_at'] as String?) ?? '', userId: '',
     );
   }
 

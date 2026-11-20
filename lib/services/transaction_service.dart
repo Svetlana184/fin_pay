@@ -16,7 +16,7 @@ class TransactionService {
     final query = <String, String>{
       'limit': limit.toString(),
       'offset': offset.toString(),
-      if (type != null) 'type': type,
+      'type': ?type,
     };
 
     final res = await _client.get('/api/transactions', query: query);
@@ -62,7 +62,7 @@ class TransactionService {
       'to_account': toAccount,
       'amount': amount,
       'recipient_name': recipientName,
-      if (description != null) 'description': description,
+      'description': ?description,
       'save_beneficiary': saveBeneficiary,
     };
 

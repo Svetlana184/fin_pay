@@ -8,13 +8,13 @@ class TransferRecipient {
   final String? lastTransferAt;
   final String createdAt;
 
-  TransferRecipient({
+  const TransferRecipient({
     required this.id,
     required this.userId,
     required this.recipientName,
     required this.recipientAccount,
     this.recipientBank,
-    required this.isFavorite,
+    this.isFavorite = false,
     this.lastTransferAt,
     required this.createdAt,
   });
@@ -22,13 +22,13 @@ class TransferRecipient {
   factory TransferRecipient.fromJson(Map<String, dynamic> json) {
     return TransferRecipient(
       id: json['id'] as String,
-      userId: (json['user_id'] as String?) ?? '',
-      recipientName: (json['recipient_name'] as String?) ?? '',
-      recipientAccount: (json['recipient_account'] as String?) ?? '',
+      userId: json['user_id'] as String? ?? '',
+      recipientName: json['recipient_name'] as String? ?? '',
+      recipientAccount: json['recipient_account'] as String? ?? '',
       recipientBank: json['recipient_bank'] as String?,
-      isFavorite: (json['is_favorite'] as bool?) ?? false,
+      isFavorite: json['is_favorite'] as bool? ?? false,
       lastTransferAt: json['last_transfer_at'] as String?,
-      createdAt: (json['created_at'] as String?) ?? '',
+      createdAt: json['created_at'] as String? ?? '',
     );
   }
 

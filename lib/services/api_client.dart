@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiClient {
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl = 'http://192.168.1.185:3000';
   final _storage = const FlutterSecureStorage();
 
   Future<Map<String, String>> _headers({bool auth = true}) async {

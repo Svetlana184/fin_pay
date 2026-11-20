@@ -1,10 +1,11 @@
 import 'dart:convert';
+import 'package:flutter/widgets.dart';
+import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../models/user.dart';
 
 class AuthService {
-  static const String baseUrl = 'http://localhost:3000';
+  static const String baseUrl = 'http://192.168.1.185:3000';
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   // Регистрация
@@ -47,10 +48,7 @@ class AuthService {
       final response = await http.post(
         Uri.parse('$baseUrl/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'phone': phone,
-          'password': password,
-        }),
+        body: jsonEncode({'phone': phone, 'password': password}),
       );
 
       final data = jsonDecode(response.body);
@@ -108,10 +106,10 @@ class AuthService {
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode({
-          if (email != null) 'email': email,
-          if (city != null) 'city': city,
-          if (country != null) 'country': country,
-          if (avatarUrl != null) 'avatar_url': avatarUrl,
+          'email': ?email,
+          'city': ?city,
+          'country': ?country,
+          'avatar_url': ?avatarUrl,
         }),
       );
 
@@ -163,8 +161,11 @@ class AuthService {
   }
 
   // Выход
-  Future<void> logout() async {
+  Future<void> logout(BuildContext context) async {
     await _storage.delete(key: 'auth_token');
+    // Используем go для замены всего стека
+    // ignore: use_build_context_synchronously
+    context.go('/login');
   }
 
   // Получение токена
