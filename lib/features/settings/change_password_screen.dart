@@ -1,5 +1,5 @@
-import 'package:fin_pay/features/auth/password_changed_success_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../services/settings_service.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
@@ -153,11 +153,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     setState(() => _isLoading = false);
 
     if (result['success'] == true) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const PasswordChangedSuccessScreen()),
-      );
+      // ИЗМЕНЕНО: разлогиниваем и ведём на /login
+      await _settingsService.logout();
+      if (mounted) {
+        context.go('/login');
+      }
     } else {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result['error'] ?? 'Ошибка'), backgroundColor: Colors.red),
       );

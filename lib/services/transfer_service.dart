@@ -7,11 +7,11 @@ class TransferService {
   /// Получить список получателей
   Future<List<TransferRecipient>> getBeneficiaries() async {
     try {
-      final res = await _client.get('/api/transfer-recipients');
+      // ИЗМЕНЕНО: /api/transfer-recipients → /api/beneficiaries
+      final res = await _client.get('/api/beneficiaries');
       final List<dynamic> items = res['data'] ?? [];
       return items.map((json) => TransferRecipient.fromJson(json)).toList();
     } catch (e) {
-      // Демо-данные если API недоступен
       return _getDemoRecipients();
     }
   }
@@ -22,7 +22,8 @@ class TransferService {
     required String account,
     String? bank,
   }) async {
-    await _client.post('/api/transfer-recipients', body: {
+    // ИЗМЕНЕНО: /api/transfer-recipients → /api/beneficiaries
+    await _client.post('/api/beneficiaries', body: {
       'recipient_name': name,
       'recipient_account': account,
       'recipient_bank': bank,
@@ -53,7 +54,6 @@ class TransferService {
     }
   }
 
-  /// Конвертация суммы в текст (упрощённая)
   String amountToWords(double amount) {
     final whole = amount.toInt();
     final cents = ((amount - whole) * 100).round();
@@ -141,5 +141,4 @@ class TransferService {
       ),
     ];
   }
-
 }

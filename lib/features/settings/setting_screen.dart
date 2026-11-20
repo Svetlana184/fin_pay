@@ -33,13 +33,14 @@ class _SettingScreenState extends State<SettingScreen> {
       final lang = await _settingsService.getLanguage();
       if (mounted) {
         setState(() {
-          _user = userData as User?;
+          _user = User.fromJson(userData);
           _biometricEnabled = bioEnabled;
           _language = lang;
           _loading = false;
         });
       }
     } catch (e) {
+      debugPrint('SettingScreen load error: $e');
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -106,7 +107,7 @@ class _SettingScreenState extends State<SettingScreen> {
                 _buildMenuItem(
                   icon: Icons.lock_outline,
                   title: 'Password',
-                  onTap: () => context.push('/change-password'),
+                  onTap: () => context.push('/setting/change-password'),
                 ),
                 _buildMenuItem(
                   icon: Icons.fingerprint,
@@ -138,7 +139,7 @@ class _SettingScreenState extends State<SettingScreen> {
                 _buildMenuItem(
                   icon: Icons.info_outline,
                   title: 'App information',
-                  onTap: () => context.push('/app-info'),
+                  onTap: () => context.push('/setting/app-info'),
                 ),
                 _buildMenuItem(
                   icon: Icons.headset_mic,

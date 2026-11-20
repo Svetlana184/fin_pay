@@ -1,11 +1,11 @@
-import 'package:fin_pay/models/transaction.dart';
-import 'package:fin_pay/models/user.dart';
-import 'package:fin_pay/models/card.dart';
 import 'package:flutter/material.dart' hide Card;
 import 'package:go_router/go_router.dart';
+import '../../models/card.dart';
+import '../../models/transaction.dart';
+import '../../models/user.dart';
 import '../../services/card_service.dart';
-import '../../services/user_service.dart';
 import '../../services/transaction_service.dart';
+import '../../services/user_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,6 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadData();
   }
 
+  // ИЗМЕНЕНО: парсинг Map/List<Map> в модели
   Future<void> _loadData() async {
     setState(() => _loading = true);
     try {
@@ -41,15 +42,25 @@ class _HomeScreenState extends State<HomeScreen> {
       ]);
       if (mounted) {
         setState(() {
-          _user = results[0] as User?;
-          _cards = results[1] as List<Card>;
+          _user = User.fromJson(results[0] as Map<String, dynamic>);
+          _cards = (results[1] as List<Map<String, dynamic>>)
+              .map((e) => Card.fromJson(e))
+              .toList();
           _transactions = results[2] as List<Transaction>;
           _loading = false;
         });
       }
     } catch (e) {
+      debugPrint('HomeScreen load error: $e');
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  // ИЗМЕНЕНО: заглушка для несуществующих разделов
+  void _openComingSoon(String label) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$label: раздел в разработке')),
+    );
   }
 
   @override
@@ -108,7 +119,8 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               IconButton(
                 icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 28),
-                onPressed: () => context.push('/mail'),
+                // ИЗМЕНЕНО: /mail есть в роутере (ветка mail) — оставляем push
+                onPressed: () => context.go('/mail'),
               ),
               if (_unreadNotifications > 0)
                 Positioned(
@@ -199,6 +211,17 @@ class _HomeScreenState extends State<HomeScreen> {
       {'icon': Icons.people, 'label': 'Beneficiary', 'color': const Color(0xFFE91E63), 'route': '/home/beneficiary'},
     ];
 
+    // ИЗМЕНЕНО: маршруты, которые реально есть в app_router.dart
+    const knownRoutes = {
+      '/home/account',
+      '/home/transfer',
+      '/home/withdraw',
+      '/home/pay-bill',
+      '/home/save-online',
+      '/home/credit-card',
+      '/home/beneficiary',
+    };
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -219,7 +242,15 @@ class _HomeScreenState extends State<HomeScreen> {
             itemBuilder: (context, index) {
               final action = actions[index];
               return GestureDetector(
-                onTap: () => context.push(action['route'] as String),
+                // ИЗМЕНЕНО: для отсутствующих маршрутов — заглушка
+                onTap: () {
+                  final route = action['route'] as String;
+                  if (knownRoutes.contains(route)) {
+                    context.push(route);
+                  } else {
+                    _openComingSoon((action['label'] as String).replaceAll('\n', ' '));
+                  }
+                },
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -258,7 +289,8 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               const Text('Recent Transactions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               TextButton(
-                onPressed: () => context.push('/home/transactions'),
+                // ИЗМЕНЕНО: /home/transactions закомментирован — заглушка
+                onPressed: () => _openComingSoon('История операций'),
                 child: const Text('See all'),
               ),
             ],
@@ -275,7 +307,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildTransactionTile(Transaction tx) {
     return GestureDetector(
-      onTap: () => context.push('/home/transactions'),
+      // ИЗМЕНЕНО: заглушка вместо /home/transactions
+      onTap: () => _openComingSoon('История операций'),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -312,7 +345,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   tx.formattedAmount,
                   style: TextStyle(fontWeight: FontWeight.bold, color: tx.isIncome ? Colors.green : Colors.red),
                 ),
-                Text(_formatDate(tx.createdAt as DateTime), style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+                // ИЗМЕНЕНО: createdAt — String, парсим
+                Text(_formatDate(DateTime.parse(tx.createdAt)), style: TextStyle(color: Colors.grey[500], fontSize: 11)),
               ],
             ),
           ],

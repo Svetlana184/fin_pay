@@ -4,10 +4,6 @@ import 'api_client.dart';
 class TransactionService {
   final _client = ApiClient();
 
-  // ==========================================================================
-  // 1. ПОЛУЧЕНИЕ СПИСКА ТРАНЗАКЦИЙ
-  // ==========================================================================
-
   Future<List<Transaction>> getTransactions({
     int limit = 20,
     int offset = 0,
@@ -16,7 +12,8 @@ class TransactionService {
     final query = <String, String>{
       'limit': limit.toString(),
       'offset': offset.toString(),
-      'type': ?type,
+      // ИЗМЕНЕНО: if вместо ?type
+      if (type != null) 'type': type,
     };
 
     final res = await _client.get('/api/transactions', query: query);
@@ -36,18 +33,10 @@ class TransactionService {
     return getTransactions(limit: count, offset: 0);
   }
 
-  // ==========================================================================
-  // 2. ДЕТАЛИ ТРАНЗАКЦИИ
-  // ==========================================================================
-
   Future<Transaction> getTransactionById(String id) async {
     final res = await _client.get('/api/transactions/$id');
     return Transaction.fromJson(res['data']);
   }
-
-  // ==========================================================================
-  // 3. ПЕРЕВОД СРЕДСТВ (TRANSFER)
-  // ==========================================================================
 
   Future<Map<String, dynamic>> transfer({
     required String fromCardId,
@@ -62,17 +51,14 @@ class TransactionService {
       'to_account': toAccount,
       'amount': amount,
       'recipient_name': recipientName,
-      'description': ?description,
+      // ИЗМЕНЕНО: if вместо ?description
+      if (description != null) 'description': description,
       'save_beneficiary': saveBeneficiary,
     };
 
     final res = await _client.post('/api/transactions/transfer', body: body);
     return res['data'] ?? {};
   }
-
-  // ==========================================================================
-  // 4. ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
-  // ==========================================================================
 
   double calculateTotal(List<Transaction> transactions) {
     return transactions.fold(0.0, (sum, tx) => sum + tx.amount);
@@ -90,18 +76,15 @@ class TransactionService {
         .fold(0.0, (sum, tx) => sum + tx.amount.abs());
   }
 
-  /// Сгруппировать транзакции по дате (для экрана истории)
   Map<String, List<Transaction>> groupByDate(List<Transaction> transactions) {
     final grouped = <String, List<Transaction>>{};
     for (final tx in transactions) {
-      // ИСПРАВЛЕНИЕ: парсим String в DateTime
       final dateKey = _formatDateKey(tx.createdAt);
       grouped.putIfAbsent(dateKey, () => []).add(tx);
     }
     return grouped;
   }
 
-  /// Сгруппировать транзакции по категории
   Map<String, List<Transaction>> groupByCategory(List<Transaction> transactions) {
     final grouped = <String, List<Transaction>>{};
     for (final tx in transactions) {
@@ -111,7 +94,6 @@ class TransactionService {
     return grouped;
   }
 
-  /// Форматирует дату для группировки
   String _formatDateKey(String dateString) {
     try {
       final date = DateTime.parse(dateString);
@@ -124,7 +106,6 @@ class TransactionService {
       if (txDate == yesterday) return 'Вчера';
       return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
     } catch (e) {
-      // Если не удалось распарсить, возвращаем исходную строку
       return dateString;
     }
   }

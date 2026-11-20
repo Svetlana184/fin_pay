@@ -37,8 +37,8 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       final cards = await _cardService.getCards();
       if (mounted) {
         setState(() {
-          _cards = cards.cast<Card>();
-          if (cards.isNotEmpty) _selectedCard = cards.first as Card?;
+          _cards = cards.map((e) => Card.fromJson(e)).toList();
+          if (_cards.isNotEmpty) _selectedCard = _cards.first;
           _loading = false;
         });
       }

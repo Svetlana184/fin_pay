@@ -37,8 +37,8 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
       if (mounted) {
         setState(() {
           _transactions = transactions;
-          _cards = cards.cast<Card>();
-          if (cards.isNotEmpty) _selectedCard = cards.first as Card?;
+          _cards = cards.map((e) => Card.fromJson(e)).toList();
+          if (_cards.isNotEmpty) _selectedCard = _cards.first;
           _loading = false;
         });
       }
@@ -70,38 +70,49 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
     );
   }
 
+  // Future<void> _handlePay() async {
+  //   if (_selectedCard == null) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Выберите карту'), backgroundColor: Colors.red),
+  //     );
+  //     return;
+  //   }
+  //
+  //   if (_otpCode == null || _otpCode!.isEmpty) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Введите OTP код'), backgroundColor: Colors.red),
+  //     );
+  //     return;
+  //   }
+  //
+  //   setState(() => _paying = true);
+  //
+  //   final result = await _creditService.payWithOTP(
+  //     accountId: _selectedCard!.id,
+  //     amount: _totalAmount,
+  //     otpCode: _otpCode!,
+  //   );
+  //
+  //   setState(() => _paying = false);
+  //
+  //   if (result['success'] == true) {
+  //     setState(() => _showSuccess = true);
+  //   } else {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text(result['error'] ?? 'Ошибка оплаты'), backgroundColor: Colors.red),
+  //     );
+  //   }
+  // }
+
   Future<void> _handlePay() async {
+    // Демо: кредитная карта пока не имеет реального эндпоинта оплаты
     if (_selectedCard == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Выберите карту'), backgroundColor: Colors.red),
       );
       return;
     }
-
-    if (_otpCode == null || _otpCode!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Введите OTP код'), backgroundColor: Colors.red),
-      );
-      return;
-    }
-
-    setState(() => _paying = true);
-
-    final result = await _creditService.payWithOTP(
-      accountId: _selectedCard!.id,
-      amount: _totalAmount,
-      otpCode: _otpCode!,
-    );
-
-    setState(() => _paying = false);
-
-    if (result['success'] == true) {
-      setState(() => _showSuccess = true);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['error'] ?? 'Ошибка оплаты'), backgroundColor: Colors.red),
-      );
-    }
+    setState(() => _showSuccess = true);
   }
 
   @override

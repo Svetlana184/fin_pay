@@ -42,9 +42,9 @@ class _TransferScreenState extends State<TransferScreen> {
       final recipients = await _transferService.getBeneficiaries();
       if (mounted) {
         setState(() {
-          _cards = cards.cast<Card>();
+          _cards = cards.map((e) => Card.fromJson(e)).toList();
           _recipients = recipients;
-          if (cards.isNotEmpty) _selectedCard = cards.first as Card?;
+          if (_cards.isNotEmpty) _selectedCard = _cards.first;
           _loading = false;
         });
       }
@@ -81,8 +81,7 @@ class _TransferScreenState extends State<TransferScreen> {
 
   void _onConfirm() {
     if (!_canConfirm) return;
-
-    context.push('/transfer/confirm', extra: {
+    context.push('/home/transfer/confirm', extra: {
       'fromCard': _selectedCard,
       'recipientName': _nameController.text.trim(),
       'cardNumber': _cardNumberController.text.trim(),

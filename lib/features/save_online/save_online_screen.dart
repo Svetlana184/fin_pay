@@ -13,7 +13,7 @@ class SaveOnlineScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text('Save online',
             style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 20)),
@@ -27,7 +27,7 @@ class SaveOnlineScreen extends StatelessWidget {
               title: 'Add',
               subtitle: 'Add new save online account',
               color: const Color(0xFF3B2F9F),
-              onTap: () => context.push('/save-online/add'),
+              onTap: () => context.push('/home/save-online/add'),
             ),
             const SizedBox(height: 16),
             _buildTile(
@@ -35,7 +35,7 @@ class SaveOnlineScreen extends StatelessWidget {
               title: 'Management',
               subtitle: 'Manage your save online account',
               color: const Color(0xFF7C3AED),
-              onTap: () => context.push('/management'),
+              onTap: () => context.push('/home/management'),
             ),
           ],
         ),

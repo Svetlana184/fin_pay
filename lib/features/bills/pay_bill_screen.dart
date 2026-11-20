@@ -37,7 +37,7 @@ class _PayBillScreenState extends State<PayBillScreen> {
     }
 
     if (mounted) {
-      context.push('/bill/details', extra: result);
+      context.push('/home/pay-bill/details', extra: result);
     }
   }
 

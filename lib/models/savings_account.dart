@@ -1,5 +1,6 @@
 class SavingsAccount {
   final String id;
+  final String? userId;
   final String accountNumber;
   final String accountType;
   final double balance;
@@ -15,6 +16,7 @@ class SavingsAccount {
 
   SavingsAccount({
     required this.id,
+    this.userId,
     required this.accountNumber,
     required this.accountType,
     required this.balance,
@@ -26,12 +28,13 @@ class SavingsAccount {
     required this.status,
     required this.minBalance,
     required this.createdAt,
-    required this.updatedAt, required String userId,
+    required this.updatedAt
   });
 
   factory SavingsAccount.fromJson(Map<String, dynamic> json) {
     return SavingsAccount(
       id: json['id'] as String,
+      userId: json['user_id'] as String?,
       accountNumber: (json['account_number'] as String?) ?? '',
       accountType: (json['account_type'] as String?) ?? '',
       balance: double.tryParse(json['balance']?.toString() ?? '0') ?? 0.0,
@@ -45,12 +48,13 @@ class SavingsAccount {
       status: (json['status'] as String?) ?? 'active',
       minBalance: double.tryParse(json['min_balance']?.toString() ?? '0') ?? 0.0,
       createdAt: (json['created_at'] as String?) ?? '',
-      updatedAt: (json['updated_at'] as String?) ?? '', userId: '',
+      updatedAt: (json['updated_at'] as String?) ?? '',
     );
   }
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    'user_id': userId,
     'account_number': accountNumber,
     'account_type': accountType,
     'balance': balance,

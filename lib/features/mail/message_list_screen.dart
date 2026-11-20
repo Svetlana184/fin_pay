@@ -45,7 +45,7 @@ class _MessageListScreenState extends State<MessageListScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text('Message',
             style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 20)),
@@ -63,7 +63,7 @@ class _MessageListScreenState extends State<MessageListScreen> {
             return _ConversationTile(
               conversation: conv,
               iconColor: _parseColor(conv.iconColor),
-              onTap: () => context.push('/chat/${conv.id}'),
+              onTap: () => context.push('/mail/chat/${conv.id}'),
             );
           },
         ),

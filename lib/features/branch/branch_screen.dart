@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import '../../models/atm_location.dart';
 import '../../services/atm_service.dart';
@@ -79,7 +80,7 @@ class _BranchScreenState extends State<BranchScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: const Text('Branch',
             style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 20)),
