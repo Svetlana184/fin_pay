@@ -20,7 +20,7 @@ class _CreditCardScreenState extends State<CreditCardScreen> {
   Card? _selectedCard;
   String? _otpCode;
   bool _loading = true;
-  bool _paying = false;
+  final bool _paying = false;
   bool _showSuccess = false;
 
   @override

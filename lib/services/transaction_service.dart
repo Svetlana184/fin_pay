@@ -13,7 +13,7 @@ class TransactionService {
       'limit': limit.toString(),
       'offset': offset.toString(),
       // ИЗМЕНЕНО: if вместо ?type
-      if (type != null) 'type': type,
+      'type': ?type,
     };
 
     final res = await _client.get('/api/transactions', query: query);
@@ -52,7 +52,7 @@ class TransactionService {
       'amount': amount,
       'recipient_name': recipientName,
       // ИЗМЕНЕНО: if вместо ?description
-      if (description != null) 'description': description,
+      'description': ?description,
       'save_beneficiary': saveBeneficiary,
     };
 

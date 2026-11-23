@@ -181,7 +181,7 @@ class _AtmsScreenState extends State<AtmsScreen> {
                         : ListView.separated(
                       controller: scrollController,
                       itemCount: _filtered.length,
-                      separatorBuilder: (_, __) => Divider(
+                      separatorBuilder: (_, _) => Divider(
                           height: 1, color: Colors.grey[200]),
                       itemBuilder: (context, i) =>
                           _atmTile(_filtered[i]),

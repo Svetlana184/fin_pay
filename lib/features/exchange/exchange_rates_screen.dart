@@ -42,7 +42,7 @@ class _ExchangeRateScreenState extends State<ExchangeRateScreen> {
           Expanded(
             child: ListView.separated(
               itemCount: _rates.length,
-              separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey[200]),
+              separatorBuilder: (_, _) => Divider(height: 1, color: Colors.grey[200]),
               itemBuilder: (context, i) {
                 final r = _rates[i];
                 final info = CurrencyCatalog.byCode(r.currencyTo);
