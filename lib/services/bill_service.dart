@@ -21,6 +21,15 @@ class BillService {
       return {'error': e.toString()};
     }
   }
+  /// GET /api/bills/payments-history?type=electric
+  Future<List<Map<String, dynamic>>> getPaymentHistory({String? type}) async {
+    final query = <String, String>{};
+    if (type != null) query['type'] = type;
+
+    final res = await _client.get('/api/bills/payments-history', query: query);
+    final List<dynamic> items = res['data'] ?? [];
+    return items.map((e) => Map<String, dynamic>.from(e)).toList();
+  }
 
   /// Оплатить счёт
   Future<Map<String, dynamic>> payBill({

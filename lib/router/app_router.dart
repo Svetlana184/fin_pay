@@ -2,32 +2,40 @@ import 'package:fin_pay/features/account/account_and_card_screen.dart';
 import 'package:fin_pay/features/account/card_details_screen.dart';
 import 'package:fin_pay/features/account/management_screen.dart';
 import 'package:fin_pay/features/atms/atms_screen.dart';
+import 'package:fin_pay/features/auth/forgot_password_screen.dart';
 import 'package:fin_pay/features/auth/password_changed_success_screen.dart';
 import 'package:fin_pay/features/beneficiary/add_beneficiary_screen.dart';
 import 'package:fin_pay/features/beneficiary/beneficiary_list_screen.dart';
 import 'package:fin_pay/features/bills/bill_details_screen.dart';
+import 'package:fin_pay/features/bills/pay_bill_categories_screen.dart';
 import 'package:fin_pay/features/bills/pay_bill_screen.dart';
+import 'package:fin_pay/features/bills/payment_history_screen.dart';
 import 'package:fin_pay/features/branch/branch_screen.dart';
 import 'package:fin_pay/features/branch/interest_rate_screen.dart';
 import 'package:fin_pay/features/credit_card/credit_card_screen.dart';
 import 'package:fin_pay/features/exchange/exchange_rates_screen.dart';
+import 'package:fin_pay/features/exchange/exchange_screen.dart';
 import 'package:fin_pay/features/home/home_screen.dart';
 import 'package:fin_pay/features/mail/chat_screen.dart';
 import 'package:fin_pay/features/mail/message_list_screen.dart';
+import 'package:fin_pay/features/mobile_prepaid/mobile_prepaid_confirm_screen.dart';
+import 'package:fin_pay/features/mobile_prepaid/mobile_prepaid_screen.dart';
 import 'package:fin_pay/features/save_online/add_deposit_screen.dart';
 import 'package:fin_pay/features/save_online/save_online_screen.dart';
 import 'package:fin_pay/features/search/search_screen.dart';
 import 'package:fin_pay/features/settings/app_info_screen.dart';
 import 'package:fin_pay/features/settings/change_password_screen.dart';
+import 'package:fin_pay/features/transaction_report/transaction_report_screen.dart';
 import 'package:fin_pay/features/transfer/confirm_screen.dart';
 import 'package:fin_pay/features/transfer/transfer_screen.dart';
 import 'package:fin_pay/features/withdraw/withdraw_screen.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Card;
 import 'package:go_router/go_router.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../features/auth/sign_in_screen.dart';
 import '../features/auth/sign_up_screen.dart';
 import '../features/settings/setting_screen.dart';
+import '../models/card.dart';
 
 
 // =============================================================================
@@ -81,12 +89,19 @@ final appRouter = GoRouter(
       builder: (context, state) => const SignUpScreen(),
     ),
     GoRoute(
-      path: '/change-password',
-      builder: (context, state) => const ChangePasswordScreen(),
-    ),
-    GoRoute(
-      path: '/password-changed',
-      builder: (context, state) => const PasswordChangedSuccessScreen(),
+      path: '/forgot-password',
+      builder: (context, state) => const ForgotPasswordScreen(),
+      redirect: (context, state) async {
+        final isAuthenticated = await _isAuthenticated();
+        final isAuthRoute = state.matchedLocation == '/login' ||
+            state.matchedLocation == '/register' ||
+            state.matchedLocation == '/forgot-password' ||
+            state.matchedLocation == '/password-changed';
+
+        if (!isAuthenticated && !isAuthRoute) return '/login';
+        if (isAuthenticated && isAuthRoute) return '/home';
+        return null;
+      },
     ),
 
     // ========================================================================
@@ -106,6 +121,23 @@ final appRouter = GoRouter(
               builder: (context, state) => const HomeScreen(),
               routes: [
                 GoRoute(
+                  path: 'mobile-prepaid',
+                  builder: (context, state) => const MobilePrepaidScreen(),
+                  routes: [
+                    GoRoute(
+                      path: 'confirm',
+                      builder: (context, state) {
+                        final extra = state.extra as Map<String, dynamic>? ?? {};
+                        return MobilePrepaidConfirmScreen(
+                          fromCard: extra['fromCard']! as Card,
+                          phone: extra['phone'] as String,
+                          amount: (extra['amount'] as num).toDouble(),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                GoRoute(
                   path: 'account',
                   builder: (context, state) => const AccountAndCardScreen(),
                   routes: [
@@ -115,6 +147,13 @@ final appRouter = GoRouter(
                           CardDetailsScreen(cardId: state.pathParameters['id']!),
                     ),
                   ],
+                ),
+                GoRoute(
+                  path: 'payment-history',
+                  builder: (context, state) {
+                    final type = state.uri.queryParameters['type'] ?? 'electric';
+                    return PaymentHistoryScreen(initialType: type);
+                  },
                 ),
                 GoRoute(
                   path: 'transfer',
@@ -137,16 +176,42 @@ final appRouter = GoRouter(
                     ),
                   ],
                 ),
-                // GoRoute(
-                //   path: 'transactions',
-                //   builder: (context, state) => const TransactionsScreen(),
-                // ),
+                GoRoute(
+                  path: 'exchange',
+                  builder: (context, state) => const ExchangeScreen(),
+                ),
                 GoRoute(
                   path: 'pay-bill',
-                  builder: (context, state) => const PayBillScreen(),
+                  builder: (context, state) => const PayBillCategoriesScreen(),
                   routes: [
                     GoRoute(
-                      path: 'details',
+                      path: ':type',
+                      builder: (context, state) => PayBillScreen(billType: state.pathParameters['type']!),
+                      routes: [
+                        GoRoute(
+                          path: 'details',
+                          builder: (context, state) {
+                            final billData = state.extra as Map<String, dynamic>? ?? {};
+                            return BillDetailsScreen(
+                              billData: billData,
+                              billType: state.pathParameters['type']!,
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                GoRoute(
+                  path: 'pay-bill',
+                  builder: (context, state) {
+                    // Тип счёта передаётся через query-параметр ?type=internet
+                    final type = state.uri.queryParameters['type'] ?? 'internet';
+                    return PayBillScreen(billType: type);
+                  },
+                  routes: [
+                    GoRoute(
+                      path: ':type/details',
                       builder: (context, state) {
                         final billData = state.extra as Map<String, dynamic>? ?? {};
                         return BillDetailsScreen(billData: billData);
@@ -178,10 +243,6 @@ final appRouter = GoRouter(
                   path: 'withdraw',
                   builder: (context, state) => const WithdrawScreen(),
                 ),
-                // GoRoute(
-                //   path: 'mobile-prepaid',
-                //   builder: (context, state) => const MobilePrepaidScreen(),
-                // ),
                 GoRoute(
                   path: 'save-online',
                   builder: (context, state) => const SaveOnlineScreen(),
@@ -196,10 +257,10 @@ final appRouter = GoRouter(
                   path: 'credit-card',
                   builder: (context, state) => const CreditCardScreen(),
                 ),
-                // GoRoute(
-                //   path: 'transaction-report',
-                //   builder: (context, state) => const TransactionReportScreen(),
-                // ),
+                GoRoute(
+                  path: 'transaction-report',
+                  builder: (context, state) => const TransactionReportScreen(),
+                ),
                 GoRoute(
                   path: 'beneficiary',
                   builder: (context, state) => const BeneficiaryListScreen(),

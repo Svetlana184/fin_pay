@@ -125,8 +125,8 @@ class _SignInScreenState extends State<SignInScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () => context.push('/change-password'),
-                    child: const Text('Забыли пароль?'),
+                    onPressed: () => context.push('/forgot-password'),
+                    child: const Text('Forgot password?'),
                   ),
                 ),
                 const SizedBox(height: 24),

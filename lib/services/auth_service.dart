@@ -172,4 +172,48 @@ class AuthService {
   Future<String?> getToken() async {
     return await _storage.read(key: 'auth_token');
   }
+
+  /// POST /api/auth/forgot-password — отправка OTP на телефон
+  Future<Map<String, dynamic>> forgotPassword({required String phone}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/auth/forgot-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'phone': phone}),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return {'success': true, 'otp': data['data']?['otp']};
+      }
+      return {'success': false, 'error': data['error'] ?? 'Ошибка'};
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// POST /api/auth/reset-password — смена пароля по OTP
+  Future<Map<String, dynamic>> resetPassword({
+    required String phone,
+    required String otp,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/auth/reset-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'phone': phone,
+          'otp_code': otp,
+          'new_password': newPassword,
+        }),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return {'success': true};
+      }
+      return {'success': false, 'error': data['error'] ?? 'Ошибка'};
+    } catch (e) {
+      return {'success': false, 'error': e.toString()};
+    }
+  }
 }

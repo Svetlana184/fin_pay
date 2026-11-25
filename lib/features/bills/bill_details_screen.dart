@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart' hide Card;
+import 'package:flutter/material.dart';
 import '../../models/card.dart';
+import '../../models/bill_provider.dart';
 import '../../services/card_service.dart';
 import '../../services/bill_service.dart';
 
 class BillDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> billData;
-
   const BillDetailsScreen({super.key, required this.billData});
 
   @override
@@ -23,6 +23,43 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
   bool _paying = false;
   bool _showSuccess = false;
 
+  String get _billType => widget.billData['bill_type'] ?? 'internet';
+  BillProvider? get _provider {
+    final p = widget.billData['provider'];
+    if (p == null) return null;
+    return BillProvider.fromJson(Map<String, dynamic>.from(p));
+  }
+
+  String get _title {
+    switch (_billType) {
+      case 'electric': return 'Electric bill';
+      case 'water':    return 'Water bill';
+      case 'mobile':   return 'Mobile bill';
+      case 'internet': return 'Internet bill';
+      default:         return 'Bill details';
+    }
+  }
+
+  String get _feeLabel {
+    switch (_billType) {
+      case 'electric': return 'Electric fee';
+      case 'water':    return 'Water fee';
+      case 'mobile':   return 'Mobile fee';
+      case 'internet': return 'Internet fee';
+      default:         return 'Service fee';
+    }
+  }
+
+  IconData get _illustrationIcon {
+    switch (_billType) {
+      case 'electric': return Icons.electrical_services;
+      case 'water':    return Icons.water_drop;
+      case 'mobile':   return Icons.phone_android;
+      case 'internet': return Icons.wifi;
+      default:         return Icons.receipt_long;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -35,8 +72,8 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
       final cards = await _cardService.getCards();
       if (mounted) {
         setState(() {
-          _cards = cards.map((e) => Card.fromJson(e)).toList();
-          if (_cards.isNotEmpty) _selectedCard = _cards.first;
+          _cards = cards;
+          if (cards.isNotEmpty) _selectedCard = cards.first;
           _loading = false;
         });
       }
@@ -46,7 +83,6 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
   }
 
   Future<void> _handleGetOTP() async {
-    // Демо OTP
     setState(() => _otpCode = '123456');
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('OTP код: 123456'), backgroundColor: Colors.green),
@@ -60,7 +96,6 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
       );
       return;
     }
-
     if (_otpCode == null || _otpCode!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Введите OTP код'), backgroundColor: Colors.red),
@@ -69,37 +104,22 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
     }
 
     setState(() => _paying = true);
-
     final billId = widget.billData['id'] as String?;
-    final taxBillId = widget.billData['tax_bill_id'] as String?;
     final amount = double.tryParse(widget.billData['total_amount']?.toString() ?? '0') ?? 0;
 
-    Map<String, dynamic> result;
-    if (billId != null) {
-      result = await _billService.payBill(
-        billId: billId,
-        accountId: _selectedCard!.id,
-        amount: amount,
-        otpCode: _otpCode!,
-      );
-    } else if (taxBillId != null) {
-      result = await _billService.payTax(
-        taxBillId: taxBillId,
-        accountId: _selectedCard!.id,
-        amount: amount,
-        otpCode: _otpCode!,
-      );
-    } else {
-      result = {'success': false, 'error': 'Не указан счёт'};
-    }
-
+    final result = await _billService.payBill(
+      billId: billId,
+      accountId: _selectedCard!.id,
+      amount: amount,
+      otpCode: _otpCode!,
+    );
     setState(() => _paying = false);
 
     if (result['success'] == true) {
       setState(() => _showSuccess = true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['error'] ?? 'Ошибка оплаты'), backgroundColor: Colors.red),
+        SnackBar(content: Text(result['error'] ?? 'Ошибка'), backgroundColor: Colors.red),
       );
     }
   }
@@ -108,9 +128,6 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
   Widget build(BuildContext context) {
     if (_showSuccess) return _buildSuccessScreen();
     if (_loading) return Scaffold(body: const Center(child: CircularProgressIndicator()));
-
-    final billType = widget.billData['tax_bill_id'] != null ? 'tax' : 'bill';
-    final title = billType == 'tax' ? 'Tax bill' : 'Electric bill';
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -121,28 +138,41 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(title,
+        title: Text(_title,
             style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 20)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // Иллюстрация
-            _buildIllustration(),
+            // Иллюстрация (как на скрине 2)
+            Container(
+              height: 200,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFF3B2F9F).withOpacity(0.06),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Icon(_illustrationIcon, size: 90, color: const Color(0xFF3B2F9F)),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '${widget.billData['period_from'] ?? '01/10/2019'} - ${widget.billData['period_to'] ?? '01/11/2019'}',
+              style: TextStyle(color: Colors.grey[600], fontSize: 13),
+            ),
             const SizedBox(height: 24),
 
-            // Детали счёта
-            _buildBillDetails(),
+            // Карточка деталей
+            _buildBillCard(),
             const SizedBox(height: 24),
 
             // Выбор карты
             _buildCardSelector(),
             const SizedBox(height: 24),
 
-            // OTP верификация
+            // OTP
             _buildOTPSection(),
-            const SizedBox(height: 30),
+            const SizedBox(height: 32),
 
             // Кнопка оплаты
             SizedBox(
@@ -156,7 +186,7 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
                 ),
                 child: _paying
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : Text('Pay the bill',
+                    : const Text('Pay the bill',
                     style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
@@ -166,37 +196,16 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
     );
   }
 
-  Widget _buildIllustration() {
-    return Container(
-      height: 220,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: const Color(0xFF3B2F9F).withOpacity(0.06),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned(left: 30, top: 30, child: Icon(Icons.account_balance_wallet, size: 70, color: const Color(0xFF3B2F9F))),
-          Positioned(right: 40, bottom: 30, child: Icon(Icons.phone_android, size: 70, color: const Color(0xFF3B2F9F))),
-          Positioned(top: 20, right: 60, child: Icon(Icons.monetization_on, size: 50, color: Colors.amber)),
-          Positioned(bottom: 40, left: 60, child: Icon(Icons.attach_money, size: 50, color: Colors.green)),
-          const Icon(Icons.swap_horiz, size: 80, color: Color(0xFF3B2F9F)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBillDetails() {
+  Widget _buildBillCard() {
     final recipientName = widget.billData['recipient_name'] ?? 'Jackson Maine';
     final address = widget.billData['recipient_address'] ?? '403 East 4th Street, Santa Ana';
     final phone = widget.billData['recipient_phone'] ?? '+8424599721';
     final code = widget.billData['bill_number'] ?? '#2343543';
     final periodFrom = widget.billData['period_from'] ?? '01/10/2019';
     final periodTo = widget.billData['period_to'] ?? '01/11/2019';
-    final serviceFee = double.tryParse(widget.billData['service_fee']?.toString() ?? '470') ?? 470;
+    final fee = double.tryParse(widget.billData['service_fee']?.toString() ?? '50') ?? 50;
     final tax = double.tryParse(widget.billData['tax']?.toString() ?? '10') ?? 10;
-    final total = double.tryParse(widget.billData['total_amount']?.toString() ?? '480') ?? 480;
+    final total = double.tryParse(widget.billData['total_amount']?.toString() ?? '60') ?? 60;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -210,22 +219,22 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
         children: [
           const Text('All the Bills', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
-          _buildDetailRow('Name', recipientName),
-          _buildDetailRow('Address', address),
-          _buildDetailRow('Phone number', phone),
-          _buildDetailRow('Code', code),
-          _buildDetailRow('From', periodFrom),
-          _buildDetailRow('To', periodTo),
+          _row('Name', recipientName),
+          _row('Address', address, multiline: true),
+          _row('Phone number', phone),
+          _row('Code', code),
+          _row('From', periodFrom),
+          _row('To', periodTo),
           const Divider(height: 24),
-          _buildDetailRow('Electric fee', '\$$serviceFee', isBold: true),
-          _buildDetailRow('Tax', '\$$tax', isBold: true),
+          _row(_feeLabel, '\$$fee', valueColor: const Color(0xFF3B2F9F), bold: true),
+          _row('Tax', '\$$tax', valueColor: const Color(0xFF3B2F9F), bold: true),
           const Divider(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('TOTAL', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               Text('\$$total',
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.pink)),
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.pinkAccent)),
             ],
           ),
         ],
@@ -233,14 +242,24 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {bool isBold = false}) {
+  Widget _row(String label, String value, {Color? valueColor, bool bold = false, bool multiline = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
+        crossAxisAlignment: multiline ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
-          Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal, fontSize: 14)),
+          Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 14),
+              textAlign: TextAlign.left),
+          Flexible(
+            child: Text(value,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  color: valueColor,
+                  fontSize: 14,
+                  fontWeight: bold ? FontWeight.bold : FontWeight.w600,
+                )),
+          ),
         ],
       ),
     );
@@ -283,6 +302,7 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
                 onChanged: (v) => setState(() => _otpCode = v),
                 decoration: InputDecoration(
                   hintText: 'OTP',
+                  suffixIcon: const Icon(Icons.chevron_right),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 ),
@@ -296,7 +316,8 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text('Get OTP', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text('Get OTP',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -314,7 +335,8 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                height: 250,
+                height: 240,
+                width: double.infinity,
                 decoration: BoxDecoration(
                   color: const Color(0xFF3B2F9F).withOpacity(0.08),
                   borderRadius: BorderRadius.circular(24),
@@ -322,11 +344,10 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    Positioned(left: 40, top: 40, child: Icon(Icons.credit_card, size: 80, color: Colors.blue.shade100)),
-                    Positioned(right: 30, bottom: 60, child: Icon(Icons.shield, size: 60, color: Colors.green.shade100)),
+                    Positioned(left: 30, top: 30, child: Icon(Icons.credit_card, size: 90, color: Colors.blue.shade100)),
+                    Positioned(right: 30, bottom: 40, child: Icon(Icons.shield, size: 70, color: Colors.green.shade100)),
                     Container(
-                      height: 200,
-                      width: 120,
+                      height: 180, width: 110,
                       decoration: BoxDecoration(
                         color: const Color(0xFF3B2F9F).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
@@ -342,8 +363,8 @@ class _BillDetailsScreenState extends State<BillDetailsScreen> {
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF3B2F9F)),
                   textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              const Text('You\'ve pay your electric bill',
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
+              Text("You've pay your $_billType bill!",
+                  style: const TextStyle(fontSize: 16, color: Colors.grey),
                   textAlign: TextAlign.center),
               const SizedBox(height: 40),
               SizedBox(

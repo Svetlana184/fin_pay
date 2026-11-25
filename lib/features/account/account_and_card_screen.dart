@@ -1,8 +1,12 @@
-import 'package:flutter/material.dart';
+import 'package:fin_pay/models/savings_account.dart';
+import 'package:fin_pay/models/user.dart';
+import 'package:fin_pay/services/api_client.dart';
+import 'package:flutter/material.dart' hide Card;
+import 'package:go_router/go_router.dart';
 import '../../services/card_service.dart';
+import '../../services/savings_service.dart';
 import '../../services/user_service.dart';
-import 'card_details_screen.dart';
-import 'management_screen.dart';
+import '../../models/card.dart';
 
 class AccountAndCardScreen extends StatefulWidget {
   const AccountAndCardScreen({super.key});
@@ -11,40 +15,41 @@ class AccountAndCardScreen extends StatefulWidget {
   State<AccountAndCardScreen> createState() => _AccountAndCardScreenState();
 }
 
-class _AccountAndCardScreenState extends State<AccountAndCardScreen>
-    with SingleTickerProviderStateMixin {
+class _AccountAndCardScreenState extends State<AccountAndCardScreen> {
   final _cardService = CardService();
+  final _savingsService = SavingsService();
   final _userService = UserService();
-  late TabController _tabController;
 
-  Map<String, dynamic>? _profile;
-  List<Map<String, dynamic>> _cards = [];
+  bool _showAccounts = true; // true = Account, false = Card
+  User? _user;
+  List<SavingsAccount> _accounts = [];
+  List<Card> _cards = [];
   bool _loading = true;
-  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _loadData();
   }
 
   Future<void> _loadData() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() => _loading = true);
     try {
       final results = await Future.wait([
         _userService.getProfile(),
+        _savingsService.getDeposits(),
         _cardService.getCards(),
       ]);
       if (mounted) {
         setState(() {
-          _profile = results[0] as Map<String, dynamic>;
-          _cards = results[1] as List<Map<String, dynamic>>;
+          _user = results[0] as User?;
+          _accounts = results[1] as List<SavingsAccount>;
+          _cards = results[2] as List<Card>;
           _loading = false;
         });
       }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -53,318 +58,374 @@ class _AccountAndCardScreenState extends State<AccountAndCardScreen>
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.grey[50],
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Account and card',
-          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 20),
-        ),
+        title: const Text('Account and card',
+            style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 20)),
       ),
-      body: Column(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
         children: [
-          _buildTabSwitcher(),
+          const SizedBox(height: 8),
+          _buildSegmentedSwitch(),
+          const SizedBox(height: 24),
+          _buildProfileAvatar(),
+          const SizedBox(height: 24),
           Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null
-                ? _buildError(_error!)
-                : TabBarView(
-              controller: _tabController,
-              children: [_buildAccountTab(), _buildCardTab()],
-            ),
+            child: _showAccounts ? _buildAccountsList() : _buildCardsList(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTabSwitcher() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
-      ),
+  // === Переключатель Account / Card ===
+  Widget _buildSegmentedSwitch() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          _tabButton('Account', 0),
-          _tabButton('Card', 1),
-        ],
-      ),
-    );
-  }
-
-  Widget _tabButton(String label, int index) {
-    final isSelected = _tabController.index == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => _tabController.animateTo(index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF3B2F9F) : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isSelected ? Colors.white : Colors.grey[700],
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAccountTab() {
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Профиль
-          Column(
-            children: [
-              CircleAvatar(
-                radius: 60,
-                backgroundColor: Colors.grey[300],
-                backgroundImage: _profile?['avatar_url'] != null
-                    ? NetworkImage(_profile!['avatar_url'])
-                    : null,
-                child: _profile?['avatar_url'] == null
-                    ? const Icon(Icons.person, size: 60, color: Colors.white)
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                _profile?['full_name'] ?? 'Пользователь',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF3B2F9F),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
-
-          // Список карт (как "счетов" на скриншоте)
-          if (_cards.isEmpty)
-            const Center(child: Text('Нет доступных счетов'))
-          else
-            ..._cards.asMap().entries.map((entry) {
-              final card = entry.value;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: _buildAccountCard(
-                  accountName: 'Account ${entry.key + 1}',
-                  accountNumber: card['last_4_digits'] ?? '••••',
-                  balance: '${card['balance']} ${card['currency']}',
-                  branch: 'New York', // можно брать из профиля
-                ),
-              );
+          Expanded(
+            child: _buildSegment('Account', _showAccounts, () {
+              setState(() => _showAccounts = true);
             }),
-
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ManagementScreen()),
-            ),
-            icon: const Icon(Icons.settings),
-            label: const Text('Management'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3B2F9F),
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildSegment('Card', !_showAccounts, () {
+              setState(() => _showAccounts = false);
+            }),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildAccountCard({
-    required String accountName,
-    required String accountNumber,
-    required String balance,
-    required String branch,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(accountName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              Text(accountNumber, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Available balance', style: TextStyle(color: Colors.grey[600], fontSize: 14)),
-              Text(balance, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF3B2F9F))),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Branch', style: TextStyle(color: Colors.grey[600], fontSize: 14)),
-              Text(branch, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF3B2F9F))),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCardTab() {
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (_cards.isEmpty)
-            const Center(child: Text('Нет карт'))
-          else
-            ..._cards.map((card) => Padding(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: _buildCreditCard(
-                cardHolder: _profile?['full_name'] ?? 'User',
-                cardType: card['card_type'] ?? 'Card',
-                cardNumber: card['last_4_digits'] ?? '••••',
-                balance: '${card['balance']} ${card['currency']}',
-                cardBrand: card['card_type'] ?? 'VISA',
-                gradientColors: _cardGradient(card['card_type']),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CardDetailsScreen(cardId: card['id']),
-                  ),
-                ),
-              ),
-            )),
-          const SizedBox(height: 32),
-          ElevatedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.add),
-            label: const Text('Add card'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3B2F9F),
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              minimumSize: const Size(double.infinity, 50),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<Color> _cardGradient(String? type) {
-    switch (type?.toLowerCase()) {
-      case 'visa':
-        return const [Color(0xFF1A1A4E), Color(0xFF3B82F6)];
-      case 'mastercard':
-        return const [Color(0xFFFFB347), Color(0xFFFFCC33)];
-      case 'mir':
-        return const [Color(0xFF4CAF50), Color(0xFF8BC34A)];
-      default:
-        return const [Color(0xFF1A1A4E), Color(0xFF3B82F6)];
-    }
-  }
-
-  Widget _buildCreditCard({
-    required String cardHolder,
-    required String cardType,
-    required String cardNumber,
-    required String balance,
-    required String cardBrand,
-    required List<Color> gradientColors,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildSegment(String label, bool active, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 200,
+        height: 48,
         decoration: BoxDecoration(
-          gradient: LinearGradient(colors: gradientColors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: gradientColors[0].withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))],
+          color: active ? const Color(0xFF3B2F9F) : Colors.grey[200],
+          borderRadius: BorderRadius.circular(14),
         ),
-        child: Stack(
-          children: [
-            Positioned(
-              right: -30, top: -30,
-              child: Container(width: 150, height: 150, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.1))),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(cardHolder, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      Text(cardType, style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14)),
-                      const SizedBox(height: 16),
-                      Text('•••• •••• •••• $cardNumber', style: const TextStyle(color: Colors.white, fontSize: 16, letterSpacing: 2, fontWeight: FontWeight.w500)),
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(balance, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                      Text(cardBrand.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? Colors.white : Colors.black87,
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildError(String message) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+  // === Аватар + имя ===
+  Widget _buildProfileAvatar() {
+    return Column(
+      children: [
+        CircleAvatar(
+          radius: 44,
+          backgroundColor: Colors.grey[300],
+          backgroundImage: _user?.avatarUrl != null
+              ? NetworkImage(_user!.avatarUrl!)
+              : null,
+          child: _user?.avatarUrl == null
+              ? const Icon(Icons.person, size: 44, color: Colors.white)
+              : null,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          _user?.fullName ?? 'Push Puttichai',
+          style: const TextStyle(
+            color: Color(0xFF3B2F9F),
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // === Вкладка Account: список депозитов (GET /api/savings) ===
+  Widget _buildAccountsList() {
+    if (_accounts.isEmpty) {
+      return const Center(child: Text('Нет счетов', style: TextStyle(color: Colors.grey)));
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      itemCount: _accounts.length,
+      itemBuilder: (context, i) {
+        final acc = _accounts[i];
+        return GestureDetector(
+          onTap: () => context.push('/home/management'),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 3))],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Account ${i + 1}',
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                    Text(acc.accountNumber,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _row('Available balance',
+                    '\$${acc.balance.toStringAsFixed(0)}', valueColor: const Color(0xFF3B2F9F)),
+                const SizedBox(height: 8),
+                _row('Branch', _user?.city ?? 'New York', valueColor: const Color(0xFF3B2F9F)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _row(String label, String value, {Color? valueColor}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+        Text(value, style: TextStyle(color: valueColor, fontSize: 14, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+
+  // === Вкладка Card: список карт (GET /api/cards) ===
+  Widget _buildCardsList() {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      children: [
+        ..._cards.map((card) => Padding(
+          padding: const EdgeInsets.only(bottom: 20),
+          child: GestureDetector(
+            onTap: () => context.push('/home/account/card/${card.id}'),
+            child: _buildCardWidget(card),
+          ),
+        )),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed: _showAddCardSheet,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3B2F9F),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            child: const Text('Add card',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  // === Виджет карты с градиентом (как на скрине 2) ===
+  Widget _buildCardWidget(Card card) {
+    final isVisa = card.cardType.toLowerCase().contains('visa');
+    final colors = isVisa
+        ? const [Color(0xFF1A1A4E), Color(0xFF2F7CF6)]
+        : const [Color(0xFFF6B23D), Color(0xFFF59E0B)];
+
+    final number = card.maskedNumber ??
+        '4756 •••• •••• ${card.last4Digits ?? '9018'}';
+
+    return Container(
+      height: 200,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: colors[0].withOpacity(0.35), blurRadius: 14, offset: const Offset(0, 6))],
+      ),
+      child: Stack(
         children: [
-          const Icon(Icons.error_outline, size: 48, color: Colors.red),
-          const SizedBox(height: 16),
-          Text(message, textAlign: TextAlign.center),
-          const SizedBox(height: 16),
-          ElevatedButton(onPressed: _loadData, child: const Text('Повторить')),
+          Positioned(
+            right: -30,
+            top: -30,
+            child: Container(
+              width: 160,
+              height: 160,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(isVisa ? 0.25 : 0.3),
+              ),
+            ),
+          ),
+          if (!isVisa)
+            Positioned(
+              right: 30,
+              bottom: 40,
+              child: Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.25),
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_user?.fullName ?? 'John Smith',
+                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    const Text('Amazon Platinium',
+                        style: TextStyle(color: Colors.white, fontSize: 13)),
+                    const SizedBox(height: 16),
+                    Text(number,
+                        style: const TextStyle(color: Colors.white, fontSize: 17, letterSpacing: 2)),
+                  ],
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('\$${card.balance.toStringAsFixed(2)}',
+                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                    _buildBrandLogo(isVisa),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
+  Widget _buildBrandLogo(bool isVisa) {
+    if (isVisa) {
+      return const Text('VISA',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            fontStyle: FontStyle.italic,
+          ));
+    }
+    // Логотип Mastercard: два пересекающихся круга
+    return Stack(
+      children: [
+        Container(width: 34, height: 34, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white)),
+        Padding(
+          padding: const EdgeInsets.only(left: 18),
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.6),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // === Bottom sheet добавления карты (POST /api/cards) ===
+  void _showAddCardSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => const _AddCardSheet(),
+    );
+  }
+}
+
+class _AddCardSheet extends StatefulWidget {
+  const _AddCardSheet();
+
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  State<_AddCardSheet> createState() => _AddCardSheetState();
+}
+
+class _AddCardSheetState extends State<_AddCardSheet> {
+  final _numberController = TextEditingController();
+  final _typeController = TextEditingController();
+  final _expiryController = TextEditingController();
+  bool _saving = false;
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      final client = ApiClient();
+      await client.post('/api/cards', body: {
+        'card_number': _numberController.text.trim(),
+        'card_type': _typeController.text.trim().isEmpty ? 'Visa' : _typeController.text.trim(),
+        'expires_at': _expiryController.text.trim(),
+      });
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Карта добавлена'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Add new card', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          TextField(controller: _numberController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Card number')),
+          const SizedBox(height: 12),
+          TextField(controller: _typeController, decoration: const InputDecoration(labelText: 'Card type (Visa / Mastercard)')),
+          const SizedBox(height: 12),
+          TextField(controller: _expiryController, decoration: const InputDecoration(labelText: 'Expires at (YYYY-MM-DD)')),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _saving ? null : _save,
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3B2F9F)),
+              child: _saving
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Save', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

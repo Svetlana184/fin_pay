@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
-
-import '../../services/api_client.dart';
+import 'package:fin_pay/models/user.dart';
+import 'package:flutter/material.dart' hide Card;
 import '../../services/card_service.dart';
-
+import '../../models/card.dart';
+import '../../services/user_service.dart';
 
 class CardDetailsScreen extends StatefulWidget {
   final String cardId;
@@ -14,70 +14,71 @@ class CardDetailsScreen extends StatefulWidget {
 
 class _CardDetailsScreenState extends State<CardDetailsScreen> {
   final _cardService = CardService();
-  Map<String, dynamic>? _card;
+  final _userService = UserService();
+
+  Card? _card;
+  User? _user;
   bool _loading = true;
-  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadCard();
+    _load();
   }
 
-  Future<void> _loadCard() async {
-    setState(() { _loading = true; _error = null; });
+  Future<void> _load() async {
+    setState(() => _loading = true);
     try {
-      final data = await _cardService.getCardDetails(widget.cardId);
-      if (mounted) setState(() { _card = data; _loading = false; });
+      final results = await Future.wait([
+        _cardService.getCardDetails(widget.cardId),
+        _userService.getProfile(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _card = results[0] as Card;
+          _user = results[1] as User?;
+          _loading = false;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _deleteCard() async {
-    final confirm = await showDialog<bool>(
+  Future<void> _handleDelete() async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Card'),
-        content: const Text('Are you sure you want to delete this card?'),
+        title: const Text('Delete card?'),
+        content: const Text('Карта будет удалена безвозвратно.'),
         actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
+            child: const Text('Удалить', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
+    if (confirmed != true) return;
 
-    if (confirm == true) {
-      try {
-        await _cardService.deleteCard(widget.cardId);
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Card deleted successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } on ApiException catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.message), backgroundColor: Colors.red),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-          );
-        }
+    try {
+      // Бэкенд разрешает удалять только blocked-карту → сначала блокируем
+      if (_card!.status != 'blocked') {
+        await _cardService.updateCardStatus(_card!.id, 'blocked');
+      }
+      await _cardService.deleteCard(_card!.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Карта удалена'), backgroundColor: Colors.green),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+        );
       }
     }
   }
@@ -90,71 +91,38 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Card',
-          style: TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
+        title: const Text('Card',
+            style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 20)),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(_error!),
-            const SizedBox(height: 16),
-            ElevatedButton(onPressed: _loadCard, child: const Text('Retry')),
-          ],
-        ),
-      )
+          : _card == null
+          ? const Center(child: Text('Карта не найдена'))
           : Column(
         children: [
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
               children: [
-                _buildDetailCard('Name', _card?['holder_name'] ?? '—'),
-                const SizedBox(height: 16),
-                _buildDetailCard('Card number', _card?['masked_number'] ?? '****'),
-                const SizedBox(height: 16),
-                _buildDetailCard('Valid from', _card?['valid_from'] ?? '—'),
-                const SizedBox(height: 16),
-                _buildDetailCard('Good thru', _card?['expires_at_formatted'] ?? '—'),
-                const SizedBox(height: 16),
-                _buildDetailCard(
-                  'Available balance',
-                  '${_card?['balance'] ?? 0} ${_card?['currency'] ?? ''}',
-                  isBalance: true,
-                ),
+                _buildRow('Name', _card!.holderName ?? _user?.fullName ?? 'Push Puttichai'),
+                _buildRow('Card number',
+                    _card!.maskedNumber ?? '**** **** ${_card!.last4Digits ?? '9018'}'),
+                _buildRow('Valid from', _card!.validFrom ?? '10/15'),
+                _buildRow('Good thru', _card!.expiresAtFormatted ?? '10/20'),
+                _buildRow('Available balance', '\$${_card!.balance.toStringAsFixed(0)}'),
               ],
             ),
           ),
-
-          // Кнопка удаления карты
           Padding(
-            padding: const EdgeInsets.all(24),
-            child: TextButton(
-              onPressed: _deleteCard,
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
+            padding: const EdgeInsets.only(bottom: 40),
+            child: GestureDetector(
+              onTap: _handleDelete,
               child: const Text(
                 'Delete card',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(color: Colors.pinkAccent, fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -163,40 +131,31 @@ class _CardDetailsScreenState extends State<CardDetailsScreen> {
     );
   }
 
-  Widget _buildDetailCard(String label, String value, {bool isBalance = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+  Widget _buildRow(String label, String value) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: TextStyle(color: Colors.grey[500], fontSize: 15)),
+              Flexible(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    color: Color(0xFF3B2F9F),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey[600],
-              fontSize: 16,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              color: isBalance ? const Color(0xFF3B2F9F) : Colors.black87,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
+        ),
+        Divider(height: 1, color: Colors.grey[200]),
+      ],
     );
   }
 }
